@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Behavior Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial; padding: 20px; background: #1e293b; color: white; }
+        .container { max-width: 600px; margin: 0 auto; }
+        button { background: #06b6d4; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0891b2; }
+        .card { background: #334155; padding: 20px; border-radius: 8px; margin: 10px 0; }
+        input { padding: 8px; margin: 5px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: white; }
+        .error { color: #f87171; }
+        .success { color: #4ade80; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Behavior Tracker - Test Version</h1>
+        <div id="app"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js';
+        import { getFirestore, collection, doc, getDoc, getDocs, setDoc } from 'https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js';
+
+        const app = initializeApp({
+            apiKey: "AIzaSyCxYnJhFKmqbBuNikIwsLU6dCPOU0pJwBc",
+            authDomain: "riley-alpha-testing.firebaseapp.com",
+            projectId: "riley-alpha-testing"
+        });
+
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let userProfile = null;
+
+        function render() {
+            const appDiv = document.getElementById('app');
+            
+            if (!currentUser) {
+                appDiv.innerHTML = `
+                    <div class="card">
+                        <h2>Login</h2>
+                        <input type="email" id="email" placeholder="Email" value="jschlavi@livoniapublicschools.org"><br>
+                        <input type="password" id="password" placeholder="Password" value="Admin123!"><br>
+                        <button onclick="login()">Login</button>
+                        <div id="message"></div>
+                    </div>
+                `;
+            } else {
+                appDiv.innerHTML = `
+                    <div class="card">
+                        <h2>Welcome ${userProfile?.name || currentUser.email}!</h2>
+                        <p>Role: ${userProfile?.role || 'Loading...'}</p>
+                        <button onclick="logout()">Logout</button>
+                    </div>
+                    <div class="card">
+                        <h3>Quick Actions</h3>
+                        <button onclick="viewStudents()">View Students</button>
+                        <button onclick="addTestScore()">Add Test Score</button>
+                        <div id="content"></div>
+                    </div>
+                `;
+            }
+        }
+
+        window.login = async () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const messageDiv = document.getElementById('message');
+            
+            try {
+                messageDiv.innerHTML = 'Logging in...';
+                await signInWithEmailAndPassword(auth, email, password);
+                messageDiv.innerHTML = '<span class="success">Success!</span>';
+            } catch (error) {
+                messageDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        };
+
+        window.logout = () => signOut(auth);
+
+        window.viewStudents = async () => {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = 'Loading students...';
+            
+            try {
+                const snapshot = await getDocs(collection(db, 'students'));
+                if (snapshot.empty) {
+                    contentDiv.innerHTML = '<p>No students found. Add one!</p>';
+                } else {
+                    let html = '<h4>Students:</h4><ul>';
+                    snapshot.forEach(doc => {
+                        const student = doc.data();
+                        html += `<li>${student.name} - Grade ${student.grade}</li>`;
+                    });
+                    html += '</ul>';
+                    contentDiv.innerHTML = html;
+                }
+            } catch (error) {
+                contentDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        };
+
+        window.addTestScore = async () => {
+            const contentDiv = document.getElementById('content');
+            try {
+                await setDoc(doc(db, 'scores', `test_${Date.now()}`), {
+                    studentId: 'test_student',
+                    date: new Date().toISOString().split('T')[0],
+                    subject: 'Math',
+                    scores: { 'Test Goal': 2 },
+                    teacherName: userProfile?.name || 'Test Teacher'
+                });
+                contentDiv.innerHTML = '<span class="success">Test score added!</span>';
+            } catch (error) {
+                contentDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        };
+
+        // Listen for auth changes
+        onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
+            if (user) {
+                try {
+                    const profileDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (profileDoc.exists()) {
+                        userProfile = profileDoc.data();
+                    }
+                } catch (error) {
+                    console.error('Error loading profile:', error);
+                }
+            }
+            render();
+        });
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>

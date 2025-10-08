@@ -1,0 +1,131 @@
+// Firestore Collections
+
+// 1. users/{userId}
+{
+  email: "stewart@school.edu",
+  name: "Stewart",
+  role: "teacher", // admin, achievement_team, teacher, specials_teacher, parent
+  schoolId: "lincoln-elementary",
+  assignedStudents: ["student_id_1", "student_id_2"], // for parents
+  subject: "PE", // for specials teachers only
+  createdAt: timestamp,
+  lastLogin: timestamp
+}
+
+// 2. students/{studentId}
+{
+  name: "Ethan G.",
+  grade: "3rd",
+  primaryTeacher: "Stewart",
+  switchTeacher: "Bruestle",
+  parentEmails: ["parent1@email.com", "parent2@email.com"],
+  supportStaff: ["Mrs. Thompson (Speech)"],
+  caseManager: "Mrs. Thompson",
+  schedule: ["Check-in", "Homeroom", ...],
+  goals: [
+    { text: "I will get teacher's attention", type: "0-2" },
+    { text: "Keep body safe", type: "checkbox" }
+  ],
+  goalSystem: {
+    type: "daily-percent",
+    target: 60,
+    amTarget: 30,
+    pmTarget: 30
+  },
+  behaviorButtons: [
+    { id: "shoutout", label: "🗣️ Shouting out", color: "bg-orange-600" }
+  ],
+  incentives: ["🎮 10 min free choice"],
+  iepAccommodations: [
+    { text: "Extended time (1.5x)", type: "checkbox" }
+  ],
+  plan504Accommodations: [],
+  createdAt: timestamp,
+  createdBy: "userId"
+}
+
+// 3. scores/{scoreId}  // Composite: studentId_date_subject
+{
+  studentId: "student_id_1",
+  date: "2024-10-07",
+  subject: "Math",
+  scores: {
+    "I will get teacher's attention": 2,
+    "Accept adult direction": 1,
+    "Keep body safe": true
+  },
+  teacherId: "userId",
+  teacherName: "Stewart",
+  timestamp: timestamp
+}
+
+// 4. accommodations_log/{logId}  // Weekly tracking
+{
+  studentId: "student_id_1",
+  week: "2024-W42",
+  teacherId: "userId",
+  teacherName: "Stewart",
+  accommodations: {
+    "Extended time (1.5x)": true,
+    "Frequent breaks": "A" // A=Accepted, D=Denied, I=Integrated
+  },
+  notes: "Weekly notes here...",
+  timestamp: timestamp
+}
+
+// 5. behavior_incidents/{incidentId}
+{
+  studentId: "student_id_1",
+  date: "2024-10-07",
+  time: "10:45:00",
+  behavior: "🗣️ Shouting out",
+  teacherId: "userId",
+  teacherName: "Stewart",
+  timestamp: timestamp
+}
+
+// 6. comments/{commentId}
+{
+  studentId: "student_id_1",
+  date: "2024-10-07",
+  text: "Great improvement today!",
+  teacherId: "userId",
+  teacherName: "Stewart",
+  timestamp: timestamp,
+  type: "teacher" // or "achievement_team"
+}
+
+// 7. audit_logs/{logId}  // FERPA compliance
+{
+  userId: "parent_user_id",
+  action: "parent_view_student_data",
+  studentId: "student_id_1",
+  ipAddress: "192.168.1.1",
+  userAgent: "Mozilla/5.0...",
+  timestamp: timestamp,
+  metadata: { /* additional context */ }
+}
+
+// 8. specials_schedule/{scheduleId}
+{
+  day: "A", // or "Monday" for weekday schedule
+  subject: "PE",
+  slots: [
+    {
+      class: "Stewart-3rd",
+      additionalStudents: ["Ethan G.", "Sarah M."]
+    }
+  ]
+}
+
+// 9. school_config/{schoolId}
+{
+  name: "Lincoln Elementary School",
+  logoUrl: "https://...",
+  colorTheme: "blue",
+  address: "123 Main St",
+  phone: "(555) 123-4567",
+  principal: "Dr. Sarah Johnson",
+  googleDriveBackupFolderId: "drive_folder_id",
+  createdAt: timestamp
+}

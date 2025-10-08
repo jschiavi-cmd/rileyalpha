@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Firebase Setup</title>
+    <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Click button to add test data</h1>
+    <button onclick="setupData()">Setup Test Data</button>
+    <div id="status"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCxYnJhFKmqbBuNikIwsLU6dCPOU0pJwBc",
+            authDomain: "riley-alpha-testing.firebaseapp.com",
+            projectId: "riley-alpha-testing",
+            storageBucket: "riley-alpha-testing.firebasestorage.app",
+            messagingSenderId: "294222538969",
+            appId: "1:294222538969:web:c658ab15032add7c93b6c8"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        async function setupData() {
+            const status = document.getElementById('status');
+            status.innerHTML = "Setting up...";
+
+            try {
+                // Create admin user in Auth
+                const userCred = await auth.createUserWithEmailAndPassword('admin@test.com', 'Admin123!');
+                
+                // Create user profile
+                await db.collection('users').doc(userCred.user.uid).set({
+                    email: 'admin@test.com',
+                    name: 'Admin User',
+                    role: 'admin',
+                    schoolId: 'lincoln-elementary'
+                });
+
+                // Create a test student
+                await db.collection('students').add({
+                    name: 'Test Student',
+                    grade: '3rd',
+                    primaryTeacher: 'Admin User',
+                    goals: [
+                        {text: "Follow directions", type: "0-2"},
+                        {text: "Stay safe", type: "checkbox"}
+                    ],
+                    dailyGoalTarget: 60
+                });
+
+                // Create school config
+                await db.collection('school_config').doc('lincoln-elementary').set({
+                    name: 'Riley Upper Elementary',
+                    colorTheme: 'blue'
+                });
+
+                status.innerHTML = "✅ Setup complete! You can close this.";
+            } catch (error) {
+                status.innerHTML = "Error: " + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
