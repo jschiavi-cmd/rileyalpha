@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BMWarehouse Login">
+  <title>Login - BMWarehouse</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="/styles/ui.css">
+  <style>
+    /* Page-specific styles */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+      opacity: 1 !important;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 450px;
+      padding: var(--space-md);
+    }
+
+    .login-card {
+      background-color: var(--color-surface);
+      border-radius: var(--radius-xl);
+      padding: var(--space-2xl);
+      box-shadow: var(--shadow-4);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+    }
+
+    .login-logo {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto var(--space-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--color-primary);
+      border-radius: var(--radius-full);
+      color: var(--color-on-primary);
+      font-size: var(--font-size-3xl);
+      font-weight: var(--font-weight-bold);
+    }
+
+    .login-title {
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-on-surface);
+      margin: 0 0 var(--space-xs) 0;
+    }
+
+    .login-subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--color-on-surface-variant);
+      margin: 0;
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .error-message {
+      background-color: rgba(239, 83, 80, 0.1);
+      border-left: 4px solid var(--color-error);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      color: var(--color-error);
+      font-size: var(--font-size-sm);
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+      animation: slideDown var(--transition-base);
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .login-footer {
+      margin-top: var(--space-xl);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--color-outline-variant);
+      text-align: center;
+    }
+
+    .ferpa-notice {
+      font-size: var(--font-size-xs);
+      color: var(--color-on-surface-variant);
+      line-height: var(--line-height-relaxed);
+      text-align: center;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin: var(--space-lg) 0;
+      color: var(--color-on-surface-variant);
+      font-size: var(--font-size-sm);
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background-color: var(--color-outline);
+    }
+
+    .role-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: var(--z-modal-backdrop);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn var(--transition-base);
+    }
+
+    .role-modal-backdrop.show {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .role-modal {
+      background-color: var(--color-surface-elevated);
+      border-radius: var(--radius-xl);
+      padding: var(--space-2xl);
+      max-width: 400px;
+      width: 90%;
+      box-shadow: var(--shadow-4);
+      animation: scaleIn var(--transition-slow);
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .role-modal-title {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-on-surface);
+      margin: 0 0 var(--space-md) 0;
+      text-align: center;
+    }
+
+    .role-modal-subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--color-on-surface-variant);
+      margin: 0 0 var(--space-lg) 0;
+      text-align: center;
+    }
+
+    .role-options {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .role-option {
+      padding: var(--space-lg);
+      background-color: var(--color-surface-variant);
+      border: 2px solid var(--color-outline);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-align: center;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .role-option:hover {
+      background-color: var(--color-primary);
+      color: var(--color-on-primary);
+      border-color: var(--color-primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-2);
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--color-surface-variant);
+      border-top-color: var(--color-on-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .btn-loading {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">BM</div>
+        <h1 class="login-title">BMWarehouse</h1>
+        <p class="login-subtitle">Behavior Management System</p>
+      </div>
+
+      <div id="error-message" class="error-message"></div>
+
+      <form class="login-form" id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <input 
+            type="email" 
+            id="email" 
+            class="form-input" 
+            placeholder="you@livoniapublicschools.org"
+            required
+            autocomplete="email"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            class="form-input" 
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+
+        <button type="submit" class="btn btn--primary" id="login-button">
+          Sign In
+        </button>
+      </form>
+
+      <div class="divider">OR</div>
+
+      <button type="button" class="btn btn--outline" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18" style="margin-right: 8px;">
+          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+          <path fill="#FBBC05" d="M3.964 10.706c-.18-.54-.282-1.117-.282-1.706 0-.593.102-1.17.282-1.709V4.958H.957C.347 6.173 0 7.548 0 9c0 1.452.348 2.827.957 4.042l3.007-2.336z"/>
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+        </svg>
+        Sign in with Google
+      </button>
+
+      <div class="login-footer">
+        <p class="ferpa-notice">
+          This system contains student records protected by FERPA. Unauthorized access or disclosure is prohibited by law. All activity is monitored and audited.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Role Chooser Modal -->
+  <div id="role-modal" class="role-modal-backdrop">
+    <div class="role-modal">
+      <h2 class="role-modal-title">Choose Your Role</h2>
+      <p class="role-modal-subtitle">You have multiple roles. Select which role you'd like to use for this session.</p>
+      <div class="role-options" id="role-options"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { app } from '/scripts/firebase-sdk.js';
+    import { 
+      getAuth, 
+      onAuthStateChanged, 
+      signInWithEmailAndPassword,
+      signOut
+    } from 'firebase/auth';
+    import { toast } from '/scripts/components.js';
+
+    const auth = getAuth(app);
+
+    // Check if already authenticated
+    onAuthStateChanged(auth, async (user) => {
+      if (user && !window.location.search.includes('logout')) {
+        try {
+          const tokenResult = await user.getIdTokenResult();
+          const claims = tokenResult.claims;
+          
+          // Check for saved role preference
+          const savedRole = sessionStorage.getItem('preferredRole');
+          if (savedRole) {
+            routeToRole(savedRole);
+            return;
+          }
+
+          // Route based on roles
+          await routeUser(claims);
+        } catch (err) {
+          console.error('[Login] Auth check error');
+        }
+      }
+    });
+
+    // Handle form submission
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const loginButton = document.getElementById('login-button');
+      const errorMessage = document.getElementById('error-message');
+
+      // Hide previous errors
+      errorMessage.classList.remove('show');
+
+      // Validate
+      if (!email || !password) {
+        showError('Please enter both email and password.');
+        return;
+      }
+
+      // Show loading state
+      loginButton.classList.add('btn-loading');
+      loginButton.innerHTML = '<span class="loading-spinner"></span> Signing in...';
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Get custom claims
+        const tokenResult = await user.getIdTokenResult();
+        const claims = tokenResult.claims;
+
+        // Route based on roles
+        await routeUser(claims);
+
+      } catch (error) {
+        console.error('[Login] Authentication error');
+        
+        // Show friendly error messages
+        let errorMsg = 'An error occurred. Please try again.';
+        
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+          errorMsg = 'Invalid email or password. Please try again.';
+        } else if (error.code === 'auth/too-many-requests') {
+          errorMsg = 'Too many failed attempts. Please try again later.';
+        } else if (error.code === 'auth/user-disabled') {
+          errorMsg = 'This account has been disabled. Please contact your administrator.';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMsg = 'Please enter a valid email address.';
+        } else if (error.code === 'auth/network-request-failed') {
+          errorMsg = 'Network error. Please check your connection and try again.';
+        }
+        
+        showError(errorMsg);
+        
+        // Reset button
+        loginButton.classList.remove('btn-loading');
+        loginButton.innerHTML = 'Sign In';
+      }
+    });
+
+    // FIXED: Proper role-based routing
+    async function routeUser(claims) {
+      const roles = claims?.roles || [];
+      
+      // No roles - error state
+      if (roles.length === 0) {
+        showError('Your account does not have any assigned roles. Please contact your administrator.');
+        return;
+      }
+      
+      // Single role - route directly
+      if (roles.length === 1) {
+        routeToRole(roles[0]);
+        return;
+      }
+      
+      // Multiple roles - show chooser
+      showRoleChooser(roles);
+    }
+
+    function showRoleChooser(roles) {
+      const modal = document.getElementById('role-modal');
+      const optionsContainer = document.getElementById('role-options');
+      
+      const roleNames = {
+        admin: 'Administrator',
+        achievement: 'Achievement Team',
+        teacher: 'Teacher',
+        specials: 'Specials Teacher',
+        parent: 'Parent'
+      };
+
+      optionsContainer.innerHTML = '';
+      
+      for (const role of roles) {
+        const button = document.createElement('button');
+        button.className = 'role-option';
+        button.textContent = roleNames[role] || role;
+        button.onclick = () => {
+          sessionStorage.setItem('preferredRole', role);
+          routeToRole(role);
+        };
+        optionsContainer.appendChild(button);
+      }
+
+      modal.classList.add('show');
+    }
+
+    function routeToRole(role) {
+      const routes = {
+        admin: '/admin.html',
+        achievement: '/achievement.html',
+        teacher: '/teacher.html',
+        specials: '/specials.html',
+        parent: '/parent.html'
+      };
+
+      const destination = routes[role] || '/teacher.html';
+      window.location.href = destination;
+    }
+
+    function showError(message) {
+      const errorMessage = document.getElementById('error-message');
+      errorMessage.textContent = message;
+      errorMessage.classList.add('show');
+      
+      // Scroll to top to ensure error is visible
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // TODO: Implement Google SSO
+    window.signInWithGoogle = async () => {
+      showError('Google Sign-In is not yet configured. Please use email/password login.');
+    };
+
+    // Handle logout parameter
+    if (window.location.search.includes('logout')) {
+      signOut(auth);
+      sessionStorage.removeItem('preferredRole');
+    }
+  </script>
+</body>
+</html>

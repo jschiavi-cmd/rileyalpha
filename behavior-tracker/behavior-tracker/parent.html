@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- NO CACHE - Prevents parent portal from showing stale data -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  
+  <!-- Force reload if cached -->
+  <script>
+  (function() {
+    // Check if page loaded from cache
+    if (performance && performance.navigation.type === 2) {
+      console.log('[Parent] Back button detected, forcing reload...');
+      location.reload(true);
+      return;
+    }
+    
+    // Check if page is stale (>5 minutes old)
+    const now = Date.now();
+    const cached = sessionStorage.getItem('parentPageLoadTime');
+    if (cached && (now - parseInt(cached)) > 5 * 60 * 1000) {
+      console.log('[Parent] Page stale, forcing reload...');
+      sessionStorage.setItem('parentPageLoadTime', now.toString());
+      location.reload(true);
+      return;
+    }
+    sessionStorage.setItem('parentPageLoadTime', now.toString());
+  })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BMWarehouse Parent Portal">
+  <title>Parent Portal - BMWarehouse</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="/styles/ui.css">
+  <style>
+    /* Page-specific styles */
+    .week-header {
+      background-color: var(--color-surface-elevated);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      box-shadow: var(--shadow-2);
+    }
+
+    .student-switcher {
+      margin-bottom: var(--space-lg);
+    }
+
+    .student-card {
+      background-color: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      box-shadow: var(--shadow-2);
+    }
+
+    .student-info-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 2px solid var(--color-primary);
+    }
+
+    .student-name-large {
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-on-surface);
+      margin: 0;
+    }
+
+    .student-meta-info {
+      font-size: var(--font-size-sm);
+      color: var(--color-on-surface-variant);
+      margin-top: var(--space-xs);
+    }
+
+    .weekly-matrix-container {
+      background-color: var(--color-surface-variant);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .matrix-section-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-on-surface);
+      margin-bottom: var(--space-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .weekly-matrix-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: var(--space-xs);
+      margin: var(--space-md) 0;
+      font-size: var(--font-size-sm);
+    }
+
+    .weekly-matrix-table th {
+      background-color: var(--color-surface-elevated);
+      padding: var(--space-sm);
+      font-weight: var(--font-weight-semibold);
+      text-align: center;
+      border-radius: var(--radius-sm);
+      color: var(--color-on-surface);
+    }
+
+    .weekly-matrix-table td {
+      padding: var(--space-sm);
+      text-align: center;
+      background-color: var(--color-surface);
+      border-radius: var(--radius-sm);
+    }
+
+    .daily-score {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-md);
+      font-weight: var(--font-weight-bold);
+      min-width: 50px;
+    }
+
+    .score-excellent {
+      background-color: var(--color-success);
+      color: #FFFFFF;
+    }
+
+    .score-good {
+      background-color: var(--color-warning);
+      color: #FFFFFF;
+    }
+
+    .score-needs-improvement {
+      background-color: var(--color-error);
+      color: #FFFFFF;
+    }
+
+    .score-no-data {
+      background-color: var(--color-surface-variant);
+      color: var(--color-on-surface-variant);
+    }
+
+    .comments-section {
+      background-color: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .comment-item {
+      padding: var(--space-md);
+      background-color: var(--color-surface-variant);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-sm);
+      border-left: 4px solid var(--color-primary);
+    }
+
+    .comment-date {
+      font-size: var(--font-size-xs);
+      color: var(--color-on-surface-variant);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--space-xs);
+    }
+
+    .comment-text {
+      color: var(--color-on-surface);
+      line-height: var(--line-height-relaxed);
+    }
+
+    .incident-feed {
+      background-color: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .incident-item {
+      display: flex;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background-color: var(--color-surface-variant);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-sm);
+      align-items: flex-start;
+    }
+
+    .incident-color {
+      width: 8px;
+      min-width: 8px;
+      height: 100%;
+      border-radius: var(--radius-full);
+      align-self: stretch;
+    }
+
+    .incident-content {
+      flex: 1;
+    }
+
+    .incident-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-xs);
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .incident-label {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-on-surface);
+    }
+
+    .incident-time {
+      font-size: var(--font-size-xs);
+      color: var(--color-on-surface-variant);
+    }
+
+    .incident-note {
+      font-size: var(--font-size-sm);
+      color: var(--color-on-surface-variant);
+      margin-top: var(--space-xs);
+      font-style: italic;
+    }
+
+    .incident-source {
+      font-size: var(--font-size-xs);
+      color: var(--color-on-surface-variant);
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .accommodations-section {
+      background-color: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .accommodation-item {
+      padding: var(--space-md);
+      background-color: var(--color-surface-variant);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-sm);
+    }
+
+    .accommodation-label {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-on-surface);
+      margin-bottom: var(--space-xs);
+    }
+
+    .accommodation-detail {
+      font-size: var(--font-size-sm);
+      color: var(--color-on-surface-variant);
+      line-height: var(--line-height-relaxed);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--space-2xl);
+      color: var(--color-on-surface-variant);
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: var(--space-md);
+      opacity: 0.5;
+    }
+
+    .read-only-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-sm);
+      background-color: var(--color-info);
+      color: #FFFFFF;
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .incentive-progress {
+      display: flex;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+      margin-top: var(--space-md);
+    }
+
+    .incentive-badge {
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .incentive-achieved {
+      background-color: var(--color-success);
+      color: #FFFFFF;
+    }
+
+    .incentive-not-achieved {
+      background-color: var(--color-surface-variant);
+      color: var(--color-on-surface-variant);
+      border: 1px solid var(--color-outline);
+    }
+
+    @media (max-width: 767px) {
+      .weekly-matrix-table {
+        font-size: var(--font-size-xs);
+      }
+
+      .weekly-matrix-table th,
+      .weekly-matrix-table td {
+        padding: var(--space-xs);
+      }
+
+      .incident-item {
+        flex-direction: column;
+      }
+
+      .incident-color {
+        width: 100%;
+        height: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { app } from '/scripts/firebase-sdk.js';
+    import { 
+      guardRoute, 
+      getCurrentUser, 
+      getClaims,
+      getSchoolContext
+    } from '/scripts/auth.js';
+    import { 
+      getTodayKey,
+      getWeek,
+      loadSchool,
+      loadPlan,
+      loadDay,
+      loadAccommodations
+    } from '/scripts/data.js';
+    import { parseQuery, onGuardReady } from '/scripts/router.js';
+    import { 
+      renderTopBar,
+      renderWeekPicker,
+      toast
+    } from '/scripts/components.js';
+    import { 
+      getFirestore, 
+      collection,
+      doc,
+      getDoc,
+      getDocs,
+      query,
+      where
+    } from 'firebase/firestore';
+
+    const db = getFirestore(app);
+
+    // State
+    let state = {
+      schoolId: null, // Will be loaded from getSchoolContext()
+      currentDate: new Date(),
+      students: [],
+      selectedStudentIndex: 0,
+      weekData: {}
+    };
+
+    // Guard route - parent, admin, or achievement
+    await guardRoute(['parent', 'admin', 'achievement']);
+
+    // Wait for body to be ready
+    onGuardReady(async () => {
+      try {
+        await init();
+      } catch (err) {
+        console.error('[Parent] Init error');
+        document.getElementById('app').innerHTML = `
+          <div class="container" style="padding: var(--space-xl);">
+            <div class="card">
+              <h2>Error Loading Portal</h2>
+              <p>Unable to load the parent portal. Please try refreshing the page or contact your school administrator.</p>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    async function init() {
+      // Get school context first
+      const { schoolId, user, claims } = await getSchoolContext();
+      state.schoolId = schoolId;
+
+      // Load school
+      const school = await loadSchool(state.schoolId);
+      
+      // Apply theme
+      if (school?.theme?.mode) {
+        document.documentElement.setAttribute('data-theme', school.theme.mode);
+      }
+
+      // Load student(s) for this parent
+      await loadParentStudents(user, claims);
+
+      if (state.students.length === 0) {
+        showNoStudentsMessage();
+        return;
+      }
+
+      // Load week data for selected student
+      await loadWeekData();
+
+      render(school, user, claims);
+      setupListeners();
+    }
+
+    async function loadParentStudents(user, claims) {
+      const roles = claims?.roles || [];
+      
+      // If admin or achievement, load a demo student for QA
+      if (roles.includes('admin') || roles.includes('achievement')) {
+        const studentsRef = collection(db, 'schools', state.schoolId, 'students');
+        const snapshot = await getDocs(studentsRef);
+        
+        state.students = snapshot.docs.slice(0, 2).map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      } else {
+        // Parent - load students linked to this parent's portal ID
+        // In production, this would use a parentPortalId to find students
+        // For now, we'll query by parentEmails containing the user's email
+        const studentsRef = collection(db, 'schools', state.schoolId, 'students');
+        const q = query(studentsRef, where('parentEmails', 'array-contains', user.email));
+        const snapshot = await getDocs(q);
+        
+        state.students = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
+
+      // Load plans and accommodations for each student
+      for (const student of state.students) {
+        if (student.activePlanId) {
+          student.plan = await loadPlan(state.schoolId, student.activePlanId);
+          student.accommodations = await loadAccommodations(state.schoolId, student.id);
+        }
+      }
+    }
+
+    async function loadWeekData() {
+      const student = state.students[state.selectedStudentIndex];
+      if (!student?.plan) return;
+
+      const week = getWeek(state.currentDate);
+      const startDate = new Date(week.startISO);
+      
+      state.weekData = {
+        days: [],
+        incidents: []
+      };
+
+      // Load data for each day of the week
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        const dayKey = getTodayKey(date);
+        
+        const dayData = await loadDay(state.schoolId, student.plan.id, dayKey);
+        
+        state.weekData.days.push({
+          date,
+          dayKey,
+          data: dayData
+        });
+
+        // Collect incidents
+        if (dayData?.incidents) {
+          for (const incident of dayData.incidents) {
+            state.weekData.incidents.push({
+              ...incident,
+              date,
+              dayKey
+            });
+          }
+        }
+      }
+
+      // Sort incidents by timestamp (newest first)
+      state.weekData.incidents.sort((a, b) => b.ts - a.ts);
+    }
+
+    function showNoStudentsMessage() {
+      document.getElementById('app').innerHTML = `
+        <div class="container" style="padding: var(--space-xl);">
+          <div class="card">
+            <h2>No Students Found</h2>
+            <p>We couldn't find any students associated with your account. Please contact your school administrator if you believe this is an error.</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function render(school, user, claims) {
+      const app = document.getElementById('app');
+      
+      let html = renderTopBar({
+        school,
+        user,
+        claims,
+        onMenu: () => {
+          toast('Menu coming soon', 'info');
+        }
+      });
+
+      html += '<div class="container" style="padding: var(--space-lg) var(--space-md);">';
+
+      // Week header with navigation
+      html += '<div class="week-header">';
+      
+      // Student switcher (if multiple students)
+      if (state.students.length > 1) {
+        html += '<div class="student-switcher">';
+        html += '<label class="form-label">Select Student</label>';
+        html += '<select class="form-select" onchange="window.switchStudent(parseInt(this.value))">';
+        for (let i = 0; i < state.students.length; i++) {
+          const student = state.students[i];
+          html += `
+            <option value="${i}" ${i === state.selectedStudentIndex ? 'selected' : ''}>
+              ${student.name} (Grade ${student.grade})
+            </option>
+          `;
+        }
+        html += '</select>';
+        html += '</div>';
+      }
+
+      // Week picker
+      html += renderWeekPicker({
+        date: state.currentDate,
+        onChange: (newDate) => {
+          state.currentDate = new Date(newDate);
+          init();
+        }
+      });
+
+      html += '</div>'; // week-header
+
+      // Student content
+      const student = state.students[state.selectedStudentIndex];
+      if (!student) {
+        html += '<div class="empty-state"><p>No student selected</p></div>';
+      } else if (!student.plan) {
+        html += `
+          <div class="student-card">
+            <h2>${student.name}</h2>
+            <p>This student does not currently have an active behavior plan.</p>
+          </div>
+        `;
+      } else {
+        html += renderStudentContent(student);
+      }
+
+      html += '</div>'; // container
+
+      app.innerHTML = html;
+    }
+
+    function renderStudentContent(student) {
+      let html = '<div class="student-card">';
+      
+      // Student header
+      html += '<div class="student-info-header">';
+      html += '<div>';
+      html += `<h1 class="student-name-large">${student.name}</h1>`;
+      html += `<div class="student-meta-info">Grade ${student.grade} â€¢ Teacher: ${student.teacherId || 'Unknown'}</div>`;
+      html += '</div>';
+      html += '<div class="read-only-badge">';
+      html += `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+        </svg>
+        Read-Only View
+      `;
+      html += '</div>';
+      html += '</div>';
+
+      // Weekly matrix
+      html += renderWeeklyMatrix(student);
+
+      // Incentive progress
+      if (student.plan.incentives?.thresholds) {
+        html += renderIncentiveProgress(student);
+      }
+
+      html += '</div>'; // student-card
+
+      // Comments section
+      html += renderComments();
+
+      // Accommodations
+      if (student.accommodations?.entries?.length > 0) {
+        html += renderAccommodations(student.accommodations);
+      }
+
+      // Incident feed
+      html += renderIncidentFeed();
+
+      return html;
+    }
+
+    function renderWeeklyMatrix(student) {
+      const plan = student.plan;
+      
+      let html = '<div class="weekly-matrix-container">';
+      html += '<div class="matrix-section-title">';
+      html += `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+        </svg>
+        Weekly Progress
+      `;
+      html += '</div>';
+
+      html += '<table class="weekly-matrix-table">';
+      
+      // Header row
+      html += '<thead><tr>';
+      html += '<th>Day</th>';
+      for (const day of state.weekData.days) {
+        const dayName = day.date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayNum = day.date.getDate();
+        html += `<th>${dayName}<br/>${dayNum}</th>`;
+      }
+      html += '</tr></thead>';
+
+      // Daily scores row
+      html += '<tbody><tr>';
+      html += '<td style="font-weight: var(--font-weight-semibold);">Daily %</td>';
+      for (const day of state.weekData.days) {
+        const pct = day.data?.totals?.pct;
+        html += '<td>';
+        if (pct !== undefined && pct !== null) {
+          const scoreClass = pct >= 85 ? 'score-excellent' : pct >= 70 ? 'score-good' : 'score-needs-improvement';
+          html += `<div class="daily-score ${scoreClass}">${pct}%</div>`;
+        } else {
+          html += '<div class="daily-score score-no-data">â€”</div>';
+        }
+        html += '</td>';
+      }
+      html += '</tr>';
+
+      // AM/PM rows if applicable
+      if (plan.planType.includes('AMPM')) {
+        html += '<tr>';
+        html += '<td style="font-weight: var(--font-weight-semibold);">AM %</td>';
+        for (const day of state.weekData.days) {
+          const amPct = day.data?.totals?.amPct;
+          html += '<td>';
+          if (amPct !== undefined && amPct !== null) {
+            html += `<div class="daily-score score-good">${amPct}%</div>`;
+          } else {
+            html += '<div class="daily-score score-no-data">â€”</div>';
+          }
+          html += '</td>';
+        }
+        html += '</tr>';
+
+        html += '<tr>';
+        html += '<td style="font-weight: var(--font-weight-semibold);">PM %</td>';
+        for (const day of state.weekData.days) {
+          const pmPct = day.data?.totals?.pmPct;
+          html += '<td>';
+          if (pmPct !== undefined && pmPct !== null) {
+            html += `<div class="daily-score score-good">${pmPct}%</div>`;
+          } else {
+            html += '<div class="daily-score score-no-data">â€”</div>';
+          }
+          html += '</td>';
+        }
+        html += '</tr>';
+      }
+
+      html += '</tbody>';
+      html += '</table>';
+
+      html += '</div>'; // weekly-matrix-container
+      return html;
+    }
+
+    function renderIncentiveProgress(student) {
+      const plan = student.plan;
+      const weekAvg = calculateWeekAverage();
+      
+      let html = '<div class="incentive-progress">';
+      html += '<div style="font-weight: var(--font-weight-semibold); width: 100%; margin-bottom: var(--space-sm);">Incentive Goals:</div>';
+      
+      for (const threshold of plan.incentives.thresholds) {
+        const achieved = weekAvg >= threshold.pct;
+        html += `
+          <div class="incentive-badge ${achieved ? 'incentive-achieved' : 'incentive-not-achieved'}">
+            ${threshold.label} (${threshold.pct}%) ${achieved ? 'âœ“' : ''}
+          </div>
+        `;
+      }
+      
+      html += '</div>';
+      return html;
+    }
+
+    function calculateWeekAverage() {
+      let total = 0;
+      let count = 0;
+      
+      for (const day of state.weekData.days) {
+        if (day.data?.totals?.pct !== undefined && day.data?.totals?.pct !== null) {
+          total += day.data.totals.pct;
+          count++;
+        }
+      }
+      
+      return count > 0 ? Math.round(total / count) : 0;
+    }
+
+    function renderComments() {
+      let html = '<div class="comments-section">';
+      html += '<div class="matrix-section-title">';
+      html += `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+        </svg>
+        Teacher Comments
+      `;
+      html += '</div>';
+
+      let hasComments = false;
+
+      for (const day of state.weekData.days) {
+        const teacherComment = day.data?.comments?.teacher;
+        const specialsComments = day.data?.comments?.specials;
+
+        if (teacherComment) {
+          hasComments = true;
+          html += '<div class="comment-item">';
+          html += `<div class="comment-date">${day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} - Teacher</div>`;
+          html += `<div class="comment-text">${teacherComment}</div>`;
+          html += '</div>';
+        }
+
+        if (specialsComments) {
+          for (const [subject, comment] of Object.entries(specialsComments)) {
+            if (comment) {
+              hasComments = true;
+              html += '<div class="comment-item">';
+              html += `<div class="comment-date">${day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} - ${subject}</div>`;
+              html += `<div class="comment-text">${comment}</div>`;
+              html += '</div>';
+            }
+          }
+        }
+      }
+
+      if (!hasComments) {
+        html += '<div class="empty-state"><p>No comments for this week</p></div>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function renderAccommodations(accommodations) {
+      let html = '<div class="accommodations-section">';
+      html += '<div class="matrix-section-title">';
+      html += `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+        </svg>
+        Accommodations
+      `;
+      html += '</div>';
+
+      for (const entry of accommodations.entries) {
+        html += '<div class="accommodation-item">';
+        html += `<div class="accommodation-label">${entry.label}</div>`;
+        if (entry.detail) {
+          html += `<div class="accommodation-detail">${entry.detail}</div>`;
+        }
+        html += '</div>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function renderIncidentFeed() {
+      let html = '<div class="incident-feed">';
+      html += '<div class="matrix-section-title">';
+      html += `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+        </svg>
+        Incident Log
+      `;
+      html += '</div>';
+
+      if (state.weekData.incidents.length === 0) {
+        html += '<div class="empty-state"><p>No incidents logged this week</p></div>';
+      } else {
+        for (const incident of state.weekData.incidents) {
+          html += '<div class="incident-item">';
+          html += `<div class="incident-color" style="background-color: ${incident.colorHex};"></div>`;
+          html += '<div class="incident-content">';
+          html += '<div class="incident-header">';
+          html += `<div class="incident-label">${incident.label}</div>`;
+          html += `<div class="incident-time">${formatIncidentTime(incident.date, incident.ts)}</div>`;
+          html += '</div>';
+          if (incident.note) {
+            html += `<div class="incident-note">"${incident.note}"</div>`;
+          }
+          html += `<div class="incident-source">Logged by: ${incident.source === 'teacher' ? 'Classroom Teacher' : 'Specials Teacher'}</div>`;
+          html += '</div>';
+          html += '</div>';
+        }
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function formatIncidentTime(date, timestamp) {
+      const incidentDate = new Date(timestamp);
+      const timeStr = incidentDate.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      const dateStr = date.toLocaleDateString('en-US', { 
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric' 
+      });
+      return `${dateStr} at ${timeStr}`;
+    }
+
+    function setupListeners() {
+      window.switchStudent = async (index) => {
+        state.selectedStudentIndex = index;
+        await loadWeekData();
+        const user = getCurrentUser();
+        const claims = getClaims();
+        const school = await loadSchool(state.schoolId);
+        render(school, user, claims);
+      };
+    }
+  </script>
+</body>
+</html>

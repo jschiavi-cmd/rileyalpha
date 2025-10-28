@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthed() {
+      return request.auth != null;
+    }
+    
+    function hasRole(role) {
+      return isAuthed() && role in request.auth.token.roles;
+    }
+    
+    function schoolId() {
+      return request.auth.token.schoolId;
+    }
+    
+    function isOwnSchool(sid) {
+      return isAuthed() && sid == schoolId();
+    }
+    
+    // Rate limiting helper - checks if collection exists
+    function isRateLimited() {
+      return exists(/databases/$(database)/documents/_rateLimit/$(request.auth.uid));
+    }
+
+    // Schools root
+    match /schools/{sid} {
+      allow read: if isOwnSchool(sid);
+      allow update: if hasRole('admin') && isOwnSchool(sid);
+      allow create, delete: if false;
+
+      // Staff - admin write only
+      match /staff/{uid} {
+        allow read: if isOwnSchool(sid);
+        allow write: if hasRole('admin') && isOwnSchool(sid);
+      }
+
+      // Students
+      match /students/{studentId} {
+        allow read: if isOwnSchool(sid);
+        allow write: if isOwnSchool(sid) && 
+                       (hasRole('admin') || hasRole('achievement') || hasRole('teacher'));
+      }
+
+      // Plans
+      match /plans/{planId} {
+        allow read: if isOwnSchool(sid);
+        allow write: if isOwnSchool(sid) && 
+                       (hasRole('admin') || hasRole('achievement'));
+        
+        // Plan days - teacher/specials can write
+        match /days/{dayId} {
+          allow read: if isOwnSchool(sid);
+          allow write: if isOwnSchool(sid) && 
+                         (hasRole('admin') || hasRole('teacher') || hasRole('specials'));
+        }
+      }
+
+      // Accommodations
+      match /accommodations/{studentId} {
+        allow read: if isOwnSchool(sid);
+        allow write: if isOwnSchool(sid) && 
+                       (hasRole('admin') || hasRole('achievement'));
+      }
+
+      // Analytics summaries - admin only write
+      match /analytics_summaries/{rangeId} {
+        allow read: if isOwnSchool(sid);
+        allow write: if hasRole('admin') && isOwnSchool(sid);
+      }
+
+      // Audit logs - append-only, admin read
+      match /audit_logs/{logId} {
+        // Admin can read all audit logs
+        allow read: if hasRole('admin') && isOwnSchool(sid);
+        // Anyone authenticated can create audit logs (append-only)
+        allow create: if isOwnSchool(sid);
+        // No one can update or delete audit logs
+        allow update, delete: if false;
+      }
+      
+      // Audit errors fallback - append-only
+      match /_audit_errors/{errorId} {
+        // Admin can read audit errors
+        allow read: if hasRole('admin') && isOwnSchool(sid);
+        // Anyone authenticated can create error logs
+        allow create: if isOwnSchool(sid);
+        // No one can update or delete
+        allow update, delete: if false;
+      }
+      
+      // Error logs - admin read, authenticated write
+      match /_errors/{errorId} {
+        // Admin can read error logs
+        allow read: if hasRole('admin') && isOwnSchool(sid);
+        // Anyone authenticated can log errors
+        allow create: if isOwnSchool(sid);
+        // No one can update or delete
+        allow update, delete: if false;
+      }
+    }
+    
+    // Rate limiting collection - internal use only
+    match /_rateLimit/{limitId} {
+      // Only allow reads/writes from authenticated users for their own limits
+      allow read, write: if isAuthed() && limitId.matches(request.auth.uid + '_.*');
+    }
+  }
+}
